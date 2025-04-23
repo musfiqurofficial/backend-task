@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Dashboard</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f5f5f5;
+        margin: 0;
+        padding: 0;
+      }
+
+      .header {
+        background-color: #4a90e2;
+        color: white;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .logo {
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .logout-btn {
+        background-color: #e74c3c;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.3s;
+      }
+
+      .logout-btn:hover {
+        background-color: #c0392b;
+      }
+
+      .dashboard-container {
+        max-width: 800px;
+        margin: 30px auto;
+        padding: 20px;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .welcome-message {
+        font-size: 24px;
+        margin-bottom: 20px;
+        color: #333;
+      }
+
+      .user-profile {
+        display: flex;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+      }
+
+      .profile-pic {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-right: 20px;
+        border: 3px solid #4a90e2;
+      }
+
+      .profile-info {
+        flex: 1;
+      }
+
+      .user-name {
+        font-size: 20px;
+        margin: 0 0 5px 0;
+        color: #333;
+      }
+
+      .user-email {
+        color: #666;
+        margin: 0 0 10px 0;
+      }
+
+      .default-pic {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background-color: #ddd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 20px;
+        color: #666;
+        font-size: 40px;
+        border: 3px solid #4a90e2;
+      }
+
+      .stats {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 30px;
+      }
+
+      .stat-card {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        flex: 1;
+        margin: 0 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4a90e2;
+        margin: 10px 0;
+      }
+
+      .stat-label {
+        color: #666;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+        <div class="logo">MyApp</div>
+        <button class="logout-btn" id="logoutBtn">Logout</button>
+    </div>
+    
+    <div class="dashboard-container">
+        <div class="welcome-message">Welcome to your Dashboard</div>
+        
+        <div class="user-profile">
+            <div id="profileImageContainer">
+                <!-- Profile image will be inserted here by JavaScript -->
+            </div>
+            <div class="profile-info">
+                <h2 class="user-name" id="userName">Loading...</h2>
+                <p class="user-email" id="userEmail">Loading...</p>
+                <p>Member since: <span id="joinDate">Loading...</span></p>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="projectsCount">0</div>
+                <div class="stat-label">Projects</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="tasksCompleted">0</div>
+                <div class="stat-label">Tasks Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="lastLogin">-</div>
+                <div class="stat-label">Last Login</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            const userData = localStorage.getItem('user');
+            
+            if (!token || !userData) {
+                redirectToLogin();
+                return;
+            }
+            
+            try {
+                // Verify token with backend
+                const verificationResponse = await verifyToken(token);
+                
+                if (!verificationResponse.valid) {
+                    redirectToLogin();
+                    return;
+                }
+                
+                const user = JSON.parse(userData);
+                displayUserInfo(user);
+                
+                // Load fresh user data from API
+                await loadUserData(user._id);
+            } catch (error) {
+                console.error('Dashboard error:', error);
+                redirectToLogin();
+            }
+        });
+        
+        // Function to verify token with backend
+        async function verifyToken(token) {
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Token verification failed');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Token verification error:', error);
+                return { valid: false };
+            }
+        }
+        
+        // Function to load user data from API
+        async function loadUserData(userId) {
+            try {
+                const response = await fetch(`http://localhost:5000/api/auth/user/${userId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load user data');
+                }
+                
+                const data = await response.json();
+                if (data.success) {
+                    displayUserInfo(data.user);
+                    updateStats(data.stats);
+                }
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
+        }
+        
+        // Function to display user information
+        function displayUserInfo(user) {
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userEmail').textContent = user.email;
+            
+            if (user.createdAt) {
+                const joinDate = new Date(user.createdAt);
+                document.getElementById('joinDate').textContent = joinDate.toLocaleDateString();
+            }
+            
+            const profileContainer = document.getElementById('profileImageContainer');
+            profileContainer.innerHTML = '';
+            
+            if (user.image) {
+                const img = document.createElement('img');
+                img.src = user.image.startsWith('http') ? user.image : `/${user.image}`;
+                img.alt = 'Profile Picture';
+                img.className = 'profile-pic';
+                profileContainer.appendChild(img);
+            } else {
+                const defaultPic = document.createElement('div');
+                defaultPic.className = 'default-pic';
+                defaultPic.textContent = user.name.charAt(0).toUpperCase();
+                profileContainer.appendChild(defaultPic);
+            }
+            
+            document.getElementById('lastLogin').textContent = new Date().toLocaleString();
+        }
+        
+        // Function to update statistics
+        function updateStats(stats) {
+            if (stats) {
+                document.getElementById('projectsCount').textContent = stats.projects || '0';
+                document.getElementById('tasksCompleted').textContent = stats.tasksCompleted || '0';
+            }
+        }
+        
+        // Function to redirect to login page
+        function redirectToLogin() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+        }
+        
+        // Logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', redirectToLogin);
+    </script>
+</html>
